@@ -17,6 +17,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/quizzes")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:5173", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS})
+
 public class QuizController {
 
     private final QuizService quizService;
@@ -53,4 +55,42 @@ public class QuizController {
         List<QuizResultDto> results = quizService.getQuizResults(quizId, lecturerId);
         return ResponseEntity.ok(results);
     }
+
+
+    // Get quizzes for a lecture (lecturer only)
+    @GetMapping("/lecture/{lectureId}")
+    @PreAuthorize("hasRole('LECTURER')or hasRole('STUDENT')")
+    public ResponseEntity<List<Quiz>> getQuizzesForLecture(
+            @PathVariable Long lectureId,
+            @RequestHeader("X-User-Id") Long lecturerId) {
+
+        List<Quiz> quizzes = quizService.getQuizzesByLecture(lectureId, lecturerId);
+        return ResponseEntity.ok(quizzes);
+    }
+
+
+
+    // Get quiz result for student (per quiz)
+    @GetMapping("/{quizId}/my-result")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<QuizResultDto> getMyQuizResult(
+            @PathVariable Long quizId,
+            @RequestHeader("X-User-Id") Long studentId) {
+
+        QuizResultDto result = quizService.getQuizResultForStudent(quizId, studentId);
+        return ResponseEntity.ok(result);
+    }
+
+
+    // Get quiz by quizId (lecturer & student)
+    @GetMapping("/{quizId}")
+    @PreAuthorize("hasRole('LECTURER') or hasRole('STUDENT')")
+    public ResponseEntity<Quiz> getQuizById(
+            @PathVariable Long quizId,
+            @RequestHeader("X-User-Id") Long userId) {
+
+        Quiz quiz = quizService.getQuizById(quizId, userId);
+        return ResponseEntity.ok(quiz);
+    }
+
 }
