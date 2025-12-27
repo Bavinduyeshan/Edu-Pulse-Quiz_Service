@@ -1,6 +1,7 @@
 package com.Edupulse.QuizService.controller;
 
 import com.Edupulse.QuizService.model.Quiz;
+import com.Edupulse.QuizService.model.dto.QuizAttemptDetailDto;
 import com.Edupulse.QuizService.model.dto.QuizRequest;
 import com.Edupulse.QuizService.model.dto.QuizResponseRequest;
 import com.Edupulse.QuizService.model.dto.QuizResultDto;
@@ -71,6 +72,7 @@ public class QuizController {
 
 
     // Get quiz result for student (per quiz)
+    // Get quiz result for student (per quiz)
     @GetMapping("/{quizId}/my-result")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<QuizResultDto> getMyQuizResult(
@@ -78,6 +80,11 @@ public class QuizController {
             @RequestHeader("X-User-Id") Long studentId) {
 
         QuizResultDto result = quizService.getQuizResultForStudent(quizId, studentId);
+
+        if (result == null) {
+            return ResponseEntity.notFound().build();  // Return 404 if not attempted
+        }
+
         return ResponseEntity.ok(result);
     }
 
@@ -93,4 +100,15 @@ public class QuizController {
         return ResponseEntity.ok(quiz);
     }
 
+
+    // Get detailed quiz attempt (student only - for review)
+    @GetMapping("/{quizId}/attempt-details")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<QuizAttemptDetailDto> getQuizAttemptDetails(
+            @PathVariable Long quizId,
+            @RequestHeader("X-User-Id") Long studentId) {
+
+        QuizAttemptDetailDto attemptDetails = quizService.getQuizAttemptDetails(quizId, studentId);
+        return ResponseEntity.ok(attemptDetails);
+    }
 }

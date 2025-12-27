@@ -20,4 +20,6 @@ public interface QuizResponseRepository extends JpaRepository<QuizResponse, Long
 
     @Query("SELECT COUNT(qr) FROM QuizResponse qr WHERE qr.quizId = :quizId AND qr.score >= :threshold")
     long countPassedByQuizId(@Param("quizId") Long quizId, @Param("threshold") Double threshold);
+
+    List<QuizResponse> findByStudentId(Long studentId);
 }

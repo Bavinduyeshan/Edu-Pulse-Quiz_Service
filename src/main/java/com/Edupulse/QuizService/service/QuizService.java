@@ -5,11 +5,15 @@ import com.Edupulse.QuizService.model.QuizResponse;
 import com.Edupulse.QuizService.model.dto.*;
 import com.Edupulse.QuizService.repository.QuizRepository;
 import com.Edupulse.QuizService.repository.QuizResponseRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -152,8 +156,8 @@ public class QuizService {
 
 
     // Get quiz result for a student (per quiz)
+    // Option 1: Return null (simpler)
     public QuizResultDto getQuizResultForStudent(Long quizId, Long studentId) {
-
         // Validate student
         UserResponse student = userServiceClient.validateStudent(studentId);
         if (student == null) {
@@ -164,10 +168,15 @@ public class QuizService {
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new IllegalArgumentException("Quiz not found"));
 
-        // Find student's submission
-        QuizResponse response = quizResponseRepository
-                .findByStudentIdAndQuizId(studentId, quizId)
-                .orElseThrow(() -> new IllegalStateException("Quiz not attempted"));
+        // Find student's submission - RETURN NULL if not found
+        Optional<QuizResponse> responseOpt = quizResponseRepository
+                .findByStudentIdAndQuizId(studentId, quizId);
+
+        if (responseOpt.isEmpty()) {
+            return null;  // Not attempted - return null instead of throwing
+        }
+
+        QuizResponse response = responseOpt.get();
 
         return QuizResultDto.builder()
                 .quizId(quiz.getId())
@@ -200,4 +209,124 @@ public class QuizService {
         return quiz;
     }
 
+
+    public List<QuizResultDto> getQuizResultsForStudent(Long studentId, Long lecturerId) {
+        // Get all quiz responses for the student
+        List<QuizResponse> responses = quizResponseRepository.findByStudentId(studentId);
+
+        return responses.stream()
+                .map(response -> {
+                    Quiz quiz = quizRepository.findById(response.getQuizId())
+                            .orElseThrow(() -> new IllegalArgumentException("Quiz not found"));
+
+                    return QuizResultDto.builder()
+                            .quizId(quiz.getId())
+                            .title(quiz.getTitle())
+                            .studentId(studentId)
+                            .score(response.getScore())
+                            .passed(response.getResponses())
+                            .timeTaken(response.getTimeTaken())
+                            .submittedAt(response.getSubmittedAt())
+                            .build();
+                })
+                .toList();
+    }
+
+
+    public QuizAttemptDetailDto getQuizAttemptDetails(Long quizId, Long studentId) {
+        // Validate student
+        UserResponse student = userServiceClient.validateStudent(studentId);
+        if (student == null) {
+            throw new IllegalArgumentException("Student not found");
+        }
+
+        // Find quiz
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new IllegalArgumentException("Quiz not found"));
+
+        // Find student's submission
+        QuizResponse response = quizResponseRepository
+                .findByStudentIdAndQuizId(studentId, quizId)
+                .orElseThrow(() -> new IllegalStateException("Quiz not attempted"));
+
+        // Parse quiz questions JSON
+        List<QuestionDto> quizQuestions = parseQuestionsFromJson(quiz.getQuestions());
+
+        // Parse student responses JSON
+        List<Integer> studentAnswers = parseResponsesFromJson(response.getResponses());
+
+        // Build detailed question attempts
+        List<QuestionAttemptDto> questionAttempts = new ArrayList<>();
+        for (int i = 0; i < quizQuestions.size(); i++) {
+            QuestionDto question = quizQuestions.get(i);
+            int userAnswer = (i < studentAnswers.size()) ? studentAnswers.get(i) : -1;
+            boolean isCorrect = (userAnswer == question.getCorrectAnswer());
+
+            questionAttempts.add(QuestionAttemptDto.builder()
+                    .question(question)
+                    .userAnswer(userAnswer)
+                    .isCorrect(isCorrect)
+                    .build());
+        }
+
+        return QuizAttemptDetailDto.builder()
+                .quizId(quiz.getId())
+                .quizTitle(quiz.getTitle())
+                .questions(questionAttempts)
+                .score(response.getScore())
+                .timeTaken(response.getTimeTaken())
+                .submittedAt(response.getSubmittedAt())
+                .build();
+    }
+
+    // Helper method to parse questions JSON
+    private List<QuestionDto> parseQuestionsFromJson(String questionsJson) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode questionsArray = mapper.readTree(questionsJson);
+            List<QuestionDto> questions = new ArrayList<>();
+
+            for (int i = 0; i < questionsArray.size(); i++) {
+                JsonNode questionNode = questionsArray.get(i);
+
+                List<String> options = new ArrayList<>();
+                JsonNode optionsNode = questionNode.get("options");
+                if (optionsNode != null && optionsNode.isArray()) {
+                    for (JsonNode option : optionsNode) {
+                        options.add(option.asText());
+                    }
+                }
+
+                questions.add(QuestionDto.builder()
+                        .id((long) i)
+                        .question(questionNode.get("question").asText())
+                        .options(options)
+                        .correctAnswer(questionNode.get("correctAnswer").asInt())
+                        .build());
+            }
+
+            return questions;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse questions JSON", e);
+        }
+    }
+
+    // Helper method to parse responses JSON
+    private List<Integer> parseResponsesFromJson(String responsesJson) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode responsesArray = mapper.readTree(responsesJson);
+            List<Integer> responses = new ArrayList<>();
+
+            if (responsesArray.isArray()) {
+                for (JsonNode response : responsesArray) {
+                    responses.add(response.asInt());
+                }
+            }
+
+            return responses;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse responses JSON", e);
+        }
+    }
 }
