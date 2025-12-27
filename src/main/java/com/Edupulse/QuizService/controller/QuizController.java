@@ -1,10 +1,7 @@
 package com.Edupulse.QuizService.controller;
 
 import com.Edupulse.QuizService.model.Quiz;
-import com.Edupulse.QuizService.model.dto.QuizAttemptDetailDto;
-import com.Edupulse.QuizService.model.dto.QuizRequest;
-import com.Edupulse.QuizService.model.dto.QuizResponseRequest;
-import com.Edupulse.QuizService.model.dto.QuizResultDto;
+import com.Edupulse.QuizService.model.dto.*;
 import com.Edupulse.QuizService.service.QuizService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -110,5 +107,35 @@ public class QuizController {
 
         QuizAttemptDetailDto attemptDetails = quizService.getQuizAttemptDetails(quizId, studentId);
         return ResponseEntity.ok(attemptDetails);
+    }
+
+    // Get student's quiz statistics (average score and completed quiz count)
+    @GetMapping("/my-statistics")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<QuizStatisticsDto> getMyQuizStatistics(
+            @RequestHeader("X-User-Id") Long studentId) {
+
+        QuizStatisticsDto statistics = quizService.getStudentQuizStatistics(studentId);
+        return ResponseEntity.ok(statistics);
+    }
+
+    /**
+     * Get all quiz results for a specific student (lecturer only)
+     * Endpoint: GET /api/quizzes/student/{studentId}/results
+     */
+    @GetMapping("/student/{studentId}/results")
+    @PreAuthorize("hasRole('LECTURER')")
+    public ResponseEntity<List<QuizResultDto>> getQuizResultsForStudent(
+            @PathVariable Long studentId,
+            @RequestHeader("X-User-Id") Long lecturerId) {
+
+        List<QuizResultDto> results = quizService.getQuizResultsForStudent(studentId, lecturerId);
+        return ResponseEntity.ok(results);
+    }
+
+    @GetMapping("/count")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Long> getTotalQuizzes() {
+        return ResponseEntity.ok(quizService.getTotalQuizCount());
     }
 }
