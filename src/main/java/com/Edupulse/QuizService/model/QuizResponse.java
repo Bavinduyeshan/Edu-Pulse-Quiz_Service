@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -34,5 +35,7 @@ public class QuizResponse {
 
     private Integer timeTaken; // seconds
 
-    private LocalDateTime submittedAt = LocalDateTime.now();
+    @CreationTimestamp  // ← ADD THIS
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime submittedAt;  // ← REMOVE = LocalDateTime.now()
 }
